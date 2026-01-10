@@ -118,6 +118,14 @@ tailscale ip -4
 
 Now, only you (via Tailscale) can SSH into the VM.
 
+## 8. Re-authenticate upon key expiry
+
+We can periodically re-authenticate the tailscale setup on the servers by SSH-ing into them and typing:
+```bash
+tailscale up --force-reauth --advertise-exit-node
+```
+One may also choose to 'Disable Key Expiry' through admin console in tailscale for trusted devices.
+
 ---
 
 ## ✅ Done!
