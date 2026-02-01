@@ -79,6 +79,7 @@ Create separate `tmux` windows for the following tasks to keep your workflow org
 
     # Obtain an interactive session on a V100 GPU with 16 cores for 60 minutes
     sinteractive -N 1 -n 16 --gres=gpu:1 --partition=v100 --mem=10G --account=csml --qos standby --time 60
+    # NOTE: Remove `--qos standby` to get priority access (i.e., get resources quicker!)
     ```
 
 
