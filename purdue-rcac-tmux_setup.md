@@ -64,7 +64,13 @@ Create separate `tmux` windows for the following tasks to keep your workflow org
     scancel <job_id>
     ```
 
-4. **SRC** (Debug code using interactive sessions)
+4. **GIT** (Optional, for Git commands)
+    ```bash
+    # Navigate to your code repository
+    cd my_repository
+    ```
+
+5. **SRC** (Debug code using interactive sessions)
     ```bash
     # Navigate to your code repository
     cd my_repository
@@ -75,7 +81,9 @@ Create separate `tmux` windows for the following tasks to keep your workflow org
     # Activate your conda environment
     source activate myenv
 
+    ################
     # Run the above commands beforehand to avoid re-running them in the interactive session
+    ################
 
     # Obtain an interactive session on a V100 GPU with 16 cores for 60 minutes
     sinteractive -N 1 -n 16 --gres=gpu:1 --partition=v100 --mem=10G --account=csml --qos standby --time 60
