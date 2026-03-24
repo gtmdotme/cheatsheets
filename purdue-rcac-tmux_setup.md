@@ -1,5 +1,7 @@
 Latest Announcement: https://www.rcac.purdue.edu/news/7275
 
+Documentation: https://www.rcac.purdue.edu/knowledge/gilbreth/run/slurm?all=true
+
 ## SSH Access to Server
 Always connect to the same front-end node on Purdue's RCAC cluster to ensure consistent access to your `tmux` sessions. For example, you can link `gilbreth-fe00` to a specific node by updating your `~/.ssh/config` file:
 
@@ -33,8 +35,8 @@ Host gilbreth-fe00
 
 Create separate `tmux` windows for the following tasks to keep your workflow organized.
 
-> **💡 Tip:**  
-> To create a new tmux window, press `<PREFIX> + c` (default prefix is `Ctrl + b`).  
+> **💡 Tip:**
+> To create a new tmux window, press `<PREFIX> + c` (default prefix is `Ctrl + b`).
 > To rename a window, press `<PREFIX> + ,`.
 
 1. **RESOURCES** (Monitor Slurm resources)
@@ -85,8 +87,9 @@ Create separate `tmux` windows for the following tasks to keep your workflow org
     # Run the above commands beforehand to avoid re-running them in the interactive session
     ################
 
-    # Obtain an interactive session on a V100 GPU with 16 cores for 60 minutes
-    sinteractive -N 1 -n 16 --gres=gpu:1 --partition=v100 --mem=10G --account=csml --qos standby --time 60
+    # Obtain an interactive session on a A30 GPU with 8 cores for 5 minutes
+    sinteractive -N 1 -n 8 --gres=gpu:1 --partition=a30 --mem=10G --account=csml --qos standby --time 5
+    # NOTE: `--qos standby` gives you low priority access to idle resources (max walltime 4 hours).
     # NOTE: Remove `--qos standby` to get priority access (i.e., get resources quicker!)
     ```
 
