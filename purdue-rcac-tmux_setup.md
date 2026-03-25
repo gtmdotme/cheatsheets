@@ -44,7 +44,7 @@ Create separate `tmux` windows for the following tasks to keep your workflow org
     # Monitor all partitions (top pane)
     watch -d -c showpartitions
 
-    # Monitor your accounts (bottom pane)
+    # Monitor accounts/partitions you have access to (bottom pane)
     watch -d slist
     ```
 
@@ -93,6 +93,10 @@ Create separate `tmux` windows for the following tasks to keep your workflow org
     # NOTE: Remove `--qos standby` to get priority access (i.e., get resources quicker!)
     ```
 
+> **💡 Notes for Gilbreth:**  
+> * Once Slurm has allocated resources to your standby job, you'll have access until the job completes or the walltime is reached, i.e., Gilbreth at this point, does not preempt your standby jobs.  
+> * Standby jobs run identically to normal QOS jobs once the resources have been allocated. The only thing that's different is the scheduling priority and maximum runtime allowed.  
+> * Standby jobs on Gilbreth are not charged (i.e., resources requested with the "standby" QOS are not pulled from your group's dedicated resources).  
 
 ## Author
 Gautam Choudhary
