@@ -1,171 +1,208 @@
 # Initial Setup
 
+Setup guide for the conda environment on the Gilbreth HPC cluster. For local installs, skip the `ssh` and `module` commands.
+
 ---
 
-# PyTorch and PyTorch Geometric Setup on Gilbreth HPC Cluster
+## Version Selection
 
-This guide provides instructions for setting up a conda environment with PyTorch and PyTorch Geometric on the Gilbreth HPC cluster at Purdue University. If you are installing on a local system, you can skip the `ssh` and `module` commands, but the rest of the instructions should still apply.
+When selecting package versions, work in this order:
 
-## Environment Setup
+1. **Python** — Check [devguide.python.org/versions](https://devguide.python.org/versions/) for stable, non-EOL releases. We use **Python 3.12**: released Oct 2023, EOL ~2028, well-supported across the entire ML stack.
 
-Skip to the **Environment Usage** section if you already have a conda environment set up with PyTorch and PyTorch Geometric.
+2. **PyG first** — PyG lags PyTorch releases by 1–3 months, so start here to find the PyTorch ceiling. We use **PyG 2.7.0** (latest). Check [github.com/pyg-team/pytorch_geometric/releases](https://github.com/pyg-team/pytorch_geometric/releases) for which PyTorch versions it supports.
 
-### Prerequisites
+3. **PyTorch** — Use the latest PyTorch version PyG officially supports. PyG 2.7.0 → **PyTorch 2.8.0**. Check [pytorch.org/get-started/previous-versions](https://pytorch.org/get-started/previous-versions/). Note: PyTorch dropped conda distribution after 2.5 — install via pip with the CUDA wheel index.
 
-- As of March 2025, CUDA 12.1 and CUDA 12.6 are available on Gilbreth
-- We'll install PyTorch and PyTorch Geometric with CUDA 12.1 (as CUDA 12.6 is backwards compatible)
-- Note: The `~/.conda` and `~/.cache` directories can be safely removed for a fresh start, if needed
+4. **TensorFlow** — Independently versioned, but both torch and TF bundle CUDA libraries that can conflict. **TF 2.21.0 conflicts with torch 2.8.0**: TF requires `nvidia-nccl-cu12>=2.27.7`, torch pins `nvidia-nccl-cu12==2.27.3`. Resolve by using a TF version compatible with torch's nccl pin. See `environment.yml` for the resolved version.
 
+---
 
-### Login to Gilbreth
-Login to the Gilbreth cluster:
+## Login to Gilbreth
 
 ```bash
-# Option 1: SSH into the cluster
+# Connect to any front-end node
 ssh username@gilbreth.rcac.purdue.edu
 
-# Option 2: SSH into a specific, say `fe00`, front-end node (for using `tmux`)
+# Connect to a specific front-end node (required for tmux session continuity)
 ssh username@gilbreth-fe00.rcac.purdue.edu
 ```
 
-> **Note**: Use `-fe00` to connect to the same front-end node as `tmux` sessions are running on, else you may not be able to access them. If you are not using `tmux`, you can connect to any front-end node.
+> **Note**: Always connect to the same `-feXX` node where your `tmux` session is running.
 
+---
 
-### Create Conda Environment
-First, check your currently loaded modules:
+## Environment Setup
 
-```bash
-module list
-```
+Skip to **Environment Usage** if you already have the environment set up.
 
-Load the conda module (note: CUDA/12.6 should already be loaded):
+### Quickstart (via environment.yml)
 
 ```bash
 module load conda
-```
-
-One way to automatically create conda environments is to use the `environment.yml` file. This file contains a list of packages and their versions that are required for your project. To create a new conda environment using this file (and skip installing packages one by one), you can use the following command:
-
-```bash
-# This will create environment (named `myenv`) in the home directory
 conda env create -f environment.yml
 ```
 
-Another way is to create a new conda environment (named `myenv`) manually with the following command:
+> **Note**: If you encounter "Network is unreachable" errors during package metadata collection, simply retry.
+
+### Manual Install
+
+Use this for step-by-step setup or troubleshooting individual packages.
+
+#### 1. Create environment
 
 ```bash
-# Option 1 (Recommended): Create environment in home directory
-conda create -n myenv python=3.10 ipython ipykernel -y
+module load conda
 
-# Option 2: Create environment in scratch directory (if low on space in home directory)
-conda create -p ~/scratch/copy-myenv python=3.10 ipython ipykernel -y
+# Recommended: install in home directory (~/.conda/envs/) for faster imports
+conda create -n myenv python=3.12 -y
+
+# Alternative: install in scratch (if home quota is tight — but slower imports)
+conda create -p ~/scratch/copy-myenv python=3.12 -y
 ```
 
-> **Note**: If you encounter connection errors like "Network is unreachable" when collecting package metadata, simply retry the command.
+Activate:
+```bash
+conda activate myenv                  # home dir install
+conda activate ~/scratch/copy-myenv   # scratch install
+```
 
-Activate the environment:
+#### 2. Install conda packages
 
 ```bash
-# Option 1 (Recommended): For home directory installation
-conda activate myenv
-
-# Option 2: For scratch directory installation
-conda activate ~/scratch/copy-myenv
+conda install -c conda-forge \
+    ipykernel ipython ipywidgets \
+    numpy pandas scipy matplotlib seaborn scikit-learn \
+    catboost gensim networkx python-igraph pymetis tqdm tabulate -y
 ```
 
-Optionally, if you want to use this environment in a Jupyter Notebook, register the kernel:
+#### 3. Install PyTorch
+
+PyTorch dropped conda distribution after 2.5 — install via pip with the CUDA wheel index.
+Reference: [pytorch.org/get-started/previous-versions](https://pytorch.org/get-started/previous-versions/)
 
 ```bash
-python -m ipykernel install --user --name myenv --display-name "Python (myenv)"
-# Output:
-# Installed kernelspec myenv in /home/username/.local/share/jupyter/kernels/myenv
+# Linux / Gilbreth (CUDA 12.6)
+pip install torch==2.8.0+cu126 --extra-index-url https://download.pytorch.org/whl/cu126
+
+# macOS Apple Silicon (MPS built into the standard PyPI wheel)
+pip install torch==2.8.0
 ```
 
+Verify:
+```bash
+# Linux
+python -c "
+import torch
+print('Torch version :', torch.__version__)
+print('CUDA version  :', torch.version.cuda)
+print('CUDA available:', torch.cuda.is_available())
+print('Device name   :', torch.cuda.get_device_name() if torch.cuda.is_available() else 'N/A')
+"
 
-### Installing PyTorch
-Install [PyTorch](https://pytorch.org/get-started/previous-versions/) with CUDA 12.1 support:
+# macOS
+python -c "
+import torch
+print('Torch version:', torch.__version__)
+print('MPS available:', torch.backends.mps.is_available())
+"
+```
+
+#### 4. Install PyTorch Geometric
+
+PyG is a pure-Python package with no CPU/CUDA variants — the same wheel works everywhere.
+Reference: [pytorch-geometric.readthedocs.io/install](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)
 
 ```bash
-# CUDA Support (Linux and Windows)
-conda install pytorch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 pytorch-cuda=12.1 -c pytorch -c nvidia -y
-
-# MPS Support (MacOS)
-conda install pytorch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 -c pytorch -y
-
-# CPU Only (Linux and Windows)
-conda install pytorch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 cpuonly -c pytorch -y
+pip install torch-geometric==2.7.0
 ```
 
-Verify the installation:
+Verify:
+```bash
+python -c "import torch_geometric; print('PyG version:', torch_geometric.__version__)"
+```
+
+> **Optional extensions** (`pyg_lib`, `torch_scatter`, `torch_sparse`): not needed for this project. PyG 2.x falls back to native PyTorch ops, and the project uses precomputed embeddings at inference time.
+
+#### 5. Install TensorFlow
+
+TF bundles its own CUDA runtime via the `[and-cuda]` extra — no separate CUDA module needed.
+Reference: [tensorflow.org/install/pip](https://www.tensorflow.org/install/pip) | [github.com/tensorflow/tensorflow/releases](https://github.com/tensorflow/tensorflow/releases)
 
 ```bash
-# CUDA Support (Linux and Windows)
-python -c "import torch; print('Torch Version: ', torch.__version__); print('Torch CUDA Version: ', torch.version.cuda); print('CUDA available: ', torch.cuda.is_available()); print('CUDA device: ', torch.cuda.current_device()); print('CUDA device name: ', torch.cuda.get_device_name())"
+# Linux (CUDA bundled)
+# Note: TF 2.21.0 conflicts with torch 2.8.0 on nvidia-nccl-cu12 — see environment.yml for resolved version
+pip install "tensorflow[and-cuda]==<see environment.yml>"
 
-# MPS Support (MacOS)
-python -c "import torch; print('Torch Version: ', torch.__version__); print('MPS available: ', torch.backends.mps.is_available())"
-
-# CPU version (Linux and Windows)
-python -c "import torch; print('Torch Version: ', torch.__version__)"
+# macOS (CPU only — standard TF has no Metal/MPS support)
+pip install tensorflow==2.21.0
 ```
 
-> **Note**: If you don't have a GPU, you may install the CPU version of PyTorch and it will work fine (just a bit slower).
+Verify:
+```bash
+python -c "
+import tensorflow as tf
+print('TF version :', tf.__version__)
+print('GPUs found :', tf.config.list_physical_devices('GPU'))
+"
+```
 
-
-### Installing PyTorch Geometric
-Install the core [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) package (same for CUDA/MPS/cpu versions):
+#### 6. Other pip packages
 
 ```bash
-pip install torch_geometric==2.6.1
+pip install pecanpy
 ```
 
-Verify the PyG installation:
+---
 
+## Cleanup
+
+**One-shot (recommended after environment creation):**
 ```bash
-python -c "import torch_geometric; print(f'PyTorch Geometric: {torch_geometric.__version__}')"
+conda clean --all -y && pip cache purge
 ```
 
-
-### Additional Packages
-Install commonly used data science packages:
-
+**Conda cache** (`~/.conda/pkgs/`):
 ```bash
-conda install -c anaconda numpy pandas seaborn matplotlib networkx tqdm scipy -y
+conda clean --all --dry-run          # preview what will be removed
+conda clean --all -y                 # remove tarballs, unused packages, index cache
+conda clean --all --force-pkgs-dirs  # also remove extracted pkg dirs (only frees space if env is deleted)
 ```
 
-Verify the installation:
+> **Note**: `--force-pkgs-dirs` removes hardlinks from the pkg cache but does **not** free disk space while the environment still exists — the data is kept alive via hardlinks in `~/.conda/envs/`.
 
+**Pip cache** (`~/.cache/pip/`):
 ```bash
-python -c "import pandas, numpy, networkx, seaborn, tqdm, matplotlib; print('Done')"
+pip cache info      # show cache size and location
+pip cache list      # list cached packages
+pip cache purge     # wipe entire cache
 ```
 
-
-### Cleanup
-Clean up the conda cache to save space:
-
-```bash
-conda clean --all
-```
-
-Reset modules to default:
-
+**Reset modules to default:**
 ```bash
 module load rcac
 ```
 
+---
+
 ## Environment Usage
-To use the environment, load the conda module, activate the environment, and run your scripts:
 
 ```bash
-# Option 1 (Recommended): If created in home directory
 module load conda
 conda activate myenv
-
-# Option 2: If created in scratch directory
-module load conda
-conda activate ~/scratch/copy-myenv
 ```
 
+Register as a Jupyter kernel (one-time):
+```bash
+python -m ipykernel install --user --name myenv --display-name "Python (myenv)"
+# Installs kernel to: /home/username/.local/share/jupyter/kernels/myenv
+```
+
+---
+
 ## Notes
-- I found that it's better to create the conda environment in the home directory rather than the scratch directory, as while the latter is on `lustre`, it is slower in loading a lot of small files (e.g., while importing torch in python) compared to the home directory which is on `nfs`. Lustre is better suited for handling large files (not a lot of small files). Additionally, the scratch directory is not backed up, so if you lose your files, you may not be able to recover them. I experimented timing the import of torch in both directories and found that it takes around 7s in the home directory and around 13s in the scratch directory.
-- No need to explicitly load `module load cuda/12.1` as the current CUDA/12.6 is backwards compatible
+
+- **Home dir vs scratch**: conda envs in `~/.conda/envs/` import ~2× faster than scratch — NFS handles many small files better than Lustre (measured: ~7s vs ~13s for `import torch`). Scratch is also not backed up.
+- **CUDA module**: No need to `module load cuda/12.6` — torch bundles its own CUDA runtime inside the pip wheel; the system driver just needs to be compatible (it is).
+- **PyTorch conda channel**: deprecated after 2.5. Always install torch via pip with `--extra-index-url https://download.pytorch.org/whl/cuXXX` going forward.
+- **Network errors**: retry `conda env create` if you hit "Network is unreachable" during metadata collection.
