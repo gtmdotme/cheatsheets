@@ -1,0 +1,56 @@
+# To create a conda environment using this file:
+#     $ conda env create -f environment.yml
+
+# To generate this file:
+#     $ conda env export --no-builds --from-history | grep -v "^prefix: " > environment.yml
+# Explanation:
+#     --no-builds: Ensures only package names and versions are included, without build information.
+#     --from-history: Only include packages that are explicitly installed by the user.
+#     grep -v "^prefix: ": Exclude the prefix line from the output, which can differ between systems.
+#     NOTE: you will need to manually edit this file to add comments, add/modify channels and reorder the packages/channels.
+name: myenv
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Python
+  - python=3.12
+  - pip
+  - ipykernel
+  - ipython
+  - ipywidgets
+  # ML Stack
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - catboost
+  - gensim
+  - networkx
+  - python-igraph
+  - pymetis
+  - tqdm
+  - tabulate
+  ## PyPI packages
+  - pip:
+    ## PyTorch
+    # Pinned to latest PyTorch version officially supported by PyG
+    # Reference: https://pytorch.org/get-started/previous-versions/
+    - --extra-index-url https://download.pytorch.org/whl/cu126
+    - torch==2.8.0+cu126; sys_platform == "linux"
+    - torch==2.8.0; sys_platform == "darwin"
+    ## PyTorch Geometric
+    # Pinned to the latest version (2.7.0)
+    # Reference: https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html
+    # Reference: https://github.com/pyg-team/pytorch_geometric/releases
+    - torch-geometric==2.7.0
+    ## TensorFlow
+    # Pinned to 2.20.0 (latest version compatible with torch 2.8.0+cu126)
+    # Reference: https://www.tensorflow.org/install/pip
+    # Reference: https://github.com/tensorflow/tensorflow/releases
+    - tensorflow[and-cuda]==2.20.0; sys_platform == "linux"
+    - tensorflow==2.20.0; sys_platform == "darwin"
+    # Other packages
+    - pecanpy
