@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Usage       : myshowpartitions [showpartitions args]
+# Purpose     : Adds #GPUs (Total/Idle) and Mem/GPU columns to existing `showpartitions` output
+# Limitations : -g, -h flags not fully supported
+
+set -euo pipefail
+
+# SLURM has no native per-GPU VRAM field, so these are hardcoded. To (re)verify, e.g.:
+#   srun -A csit -p a10 -q standby --gres=gpu:1 --mem=4G --time=00:01:00 \
+#     nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+declare -A VRAM=(
+  [a10]=24 [a30]=24 [a100-40gb]=40
+  [a100-80gb]=80 [h100]=80 [training]=80
+)
+
+# DEFINITION:
+# - Idle nodes (using `sinfo`): nodes whose SLURM state is literally "idle" (excludes mix/drain/plnd/etc).
+# - Idle GPUs (computed here): GPUs not currently allocated to any job.
+# METHODOLOGY:
+# - Per node: read Gres (total GPUs) and GresUsed (allocated GPUs) via `sinfo -N`.
+# - Sum both across nodes, per partition.
+# - Idle GPUs = total - used.
+declare -A GPU_TOTAL GPU_IDLE
+while read -r part gt gu; do
+  GPU_TOTAL[$part]=$gt
+  GPU_IDLE[$part]=$((gt - gu))
+done < <(sinfo -N -h -O "PartitionName:20,Gres:40,GresUsed:40" \
+  | grep -v "gilbreth-nodes\|araghu" \
+  | awk '
+    {
+      part = $1
+      split($2, ga, ","); split($3, ua, ",")
+      gt = 0; gu = 0
+      for (i in ga) if (ga[i] ~ /^gpu:/) { split(ga[i], x, ":"); gt = x[2] }
+      for (i in ua) if (ua[i] ~ /^gpu:/) { split(ua[i], x, ":"); gu = x[2] }
+      GT[part] += gt; GU[part] += gu
+    }
+    END { for (p in GT) print p, GT[p], GU[p] }
+  ')
+
+
+## Formatting helpers
+# colors
+GREEN=$'\033[1;32m'
+NORMAL=$'\033[0m'
+# column widths
+TOT_W=5 IDLE_W=4 VRAM_W=7
+GPU_BLOCK_W=$((TOT_W + 2 + IDLE_W))
+# center text in a column
+center() {
+  local text=$1 width=$2 diff lp rp
+  diff=$((width - ${#text}))
+  lp=$(((diff + 1) / 2)); rp=$((diff - lp))
+  printf '%*s%s%*s' "$lp" '' "$text" "$rp" ''
+}
+
+# GPU/VRAM columns for one partition's data row; blank placeholders if we have no GPU data for it.
+gpu_columns() {
+  local part=$1
+  if [[ -n ${GPU_TOTAL[$part]:-} ]]; then
+    local idle=${GPU_IDLE[$part]} color=$NORMAL
+    [[ $idle -gt 0 ]] && color=$GREEN
+    printf " %${TOT_W}d  %s%${IDLE_W}d%s %${VRAM_W}d" \
+      "${GPU_TOTAL[$part]}" "$color" "$idle" "$NORMAL" "${VRAM[$part]}"
+  else
+    printf " %${TOT_W}s  %${IDLE_W}s %${VRAM_W}s" "-" "-" "-"
+  fi
+}
+
+showpartitions "$@" | while IFS= read -r line; do
+  if [[ $line == "Partition statistics"* ]]; then
+    printf "%s\n" "$line"
+  elif [[ $line == *"Partition"*"#Nodes"* ]]; then
+    printf "%s %s %*s\n" "$line" "$(center "#GPUs" "$GPU_BLOCK_W")" "$VRAM_W" "Mem/GPU"
+  elif [[ $line == *"Name State"* ]]; then
+    printf "%s %*s  %*s %*s\n" "$line" "$TOT_W" "Total" "$IDLE_W" "Idle" "$VRAM_W" "(GB)"
+  else
+    read -r part _ <<<"$line"
+    part=${part%%:*}   # strip default/root-only/hidden partition flag suffix, if any
+    printf "%s%s\n" "$line" "$(gpu_columns "$part")"
+  fi
+done
